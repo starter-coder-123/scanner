@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item Scanner with OCR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 600px;
+            border: 2px solid #ccc;
+            margin: 20px 0;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px auto;
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+        }
+        button {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            width: 60px;
+            height: 60px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f4f4f4;
+            border: 1px solid #ccc;
+            text-align: left;
+            max-width: 600px;
+            margin: 10px auto;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Item Scanner with OCR</h1>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div class="button-container">
+        <button id="capture">&#9673;</button>
+    </div>
+    <div id="results">Results will be shown here after OCR analysis</div>
+
+    <!-- Import Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.4/dist/tesseract.min.js"></script>
+    <script>
+        const captureButton = document.getElementById('capture');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const resultsDiv = document.getElementById('results');
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (error) {
+                alert('Error accessing camera: ' + error.message);
+            }
+        }
+
+        startCamera();
+
+        captureButton.addEventListener('click', async () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/png');
+            alert('Processing image with OCR...');
+            
+            try {
+                const { data: { text } } = await Tesseract.recognize(imageData, 'eng');
+                console.log("OCR Output:", text); // Log OCR data to debug
+                const analysisResults = analyzeText(text);
+                displayResults(analysisResults);
+            } catch (error) {
+                alert('Error with OCR: ' + error.message);
+            }
+        });
+
+        function analyzeText(text) {
+            console.log("Analyzing text...");
+            // Regex patterns for MFG/Expiry dates
+            const mfgRegex = /mfg[:\s]*(\d{1,2}[\/]\d{1,2}[\/]\d{4})/i; 
+            const expRegex = /exp(?:iry)?[:\s]*(\d{1,2}[\/]\d{1,2}[\/]\d{4})/i;
+
+            console.log("Running regex matching...");
+            const mfgMatch = text.match(mfgRegex);
+            const expMatch = text.match(expRegex);
+
+            console.log('MFG Match:', mfgMatch);
+            console.log('Expiry Match:', expMatch);
+
+            if (mfgMatch && expMatch) {
+                return [
+                    `Found Manufacturing Date: ${mfgMatch[1]}`,
+                    `Found Expiry Date: ${expMatch[1]}`
+                ];
+            }
+
+            return ['Could not find MFG/Expiry dates in OCR data.'];
+        }
+
+        function displayResults(results) {
+            resultsDiv.innerHTML = '';
+            results.forEach(result => {
+                const p = document.createElement('p');
+                p.innerText = result;
+                resultsDiv.appendChild(p);
+            });
+        }
+    </script>
+</body>
+</html>
